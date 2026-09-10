@@ -18,13 +18,7 @@ version = "v1"
 [recipe]
 include = ["system/apps/thread_writer", "system/supervisord.conf", "pyproject.toml"]
 data_include = []
-# FILL IN: one entry per deliberate exclusion (paths left out, and
-# features stripped from an included path). Leave [] if nothing was.
 exclude = []
-# FILL IN: one entry per published-version modification, stated as a RULE
-# and NEVER the removed value -- the point of a modification is that the
-# value does not ship. e.g. "replace the hardcoded team channel with a
-# neutral default". Leave [] if there were none.
 modification_rules = []
 
 # Everything an adopter must deal with before this is really theirs.
@@ -55,7 +49,28 @@ modification_rules = []
 #   [[requirements.adaptation]]
 #   summary = "the digest channel is hardcoded"
 #   resolution = "ask the user which channel to watch"
-[requirements]
+[requirements.llm]
+method = "keyed"
+
+[[requirements.adaptation]]
+summary = "the blog source is hardcoded to imbue.com (BLOG_URL and _parse_blog_posts's markup selectors)"
+resolution = "point it at the adopter's own blog and rewrite the parser to match their listing's markup, or skip this and use only the paste-a-link / paste-notes inputs, which need no blog at all"
+
+[[requirements.adaptation]]
+summary = "threads from the adopter's own blog close on Imbue's mission (_close_directive)"
+resolution = "edit that closing sentence to the adopter's own mission/CTA (the external-link and notes closes are already neutral)"
+
+[[requirements.adaptation]]
+summary = "the voice presets and guidance are tuned to Imbue (VOICE_PRESETS, _VOICE_GUIDANCE name swyx, the Imbue Slack, Andrew Ng, and Yann LeCun)"
+resolution = "edit VOICE_PRESETS and _VOICE_GUIDANCE to describe the adopter's own target registers"
+
+[[requirements.adaptation]]
+summary = "the per-voice example corpora (DATA_DIR/voices/*.md) are not shipped with this template"
+resolution = "generation works out of the box via the built-in inline guidance; an adopter who wants the richer grounded-voice effect drops their own markdown corpus files under DATA_DIR/voices/ matching the _VOICE_CORPUS_FILES names in runner.py"
+
+[[requirements.adaptation]]
+summary = "the Schedule 'revive' queue's YouTube half is hardcoded to Imbue's channel (YOUTUBE_HANDLE_URL)"
+resolution = "point it at the adopter's own channel handle, or ignore it -- the blog half of the queue is independent"
 
 # What the included code needs INSTALLED. apt takes bare names: versions
 # are a function of the apt snapshot timestamp, so replaying names at the

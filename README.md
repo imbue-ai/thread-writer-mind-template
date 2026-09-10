@@ -15,28 +15,44 @@ Didn't work? Create a Minds workspace and paste this to your agent:
 
 A multi-voice, multi-format generator that turns blog posts, links, or bullet points into X threads and LinkedIn posts, with a schedule queue and a cached voice-corpus mechanism.
 
-<!-- FILL-IN (publishing agent): BEFORE reporting done, replace this comment
-with one or two plain sentences on the PROBLEM this solves -- why someone
-would want it, not how it is built. Write for a human browsing GitHub who has
-never seen the original mind. -->
+Writing didn't stop when you hit publish -- someone still has to turn a blog
+post, a trending link, or a handful of notes into a tweet, a thread, or a
+LinkedIn post, in a voice that doesn't sound like a press release. Thread
+Writer does that draft for you, in three different voices, and never posts
+anything without you reviewing it first.
 
 ## How to use it
 
-<!-- FILL-IN (publishing agent): BEFORE reporting done, replace this comment
-with how someone actually USES this once it is running: the commands,
-endpoints, screens, or workflow it exposes. This is the heart of the page, so
-give it the room it needs -- but default to concise and readable; a short list
-or a couple of worked examples beats a wall of prose. -->
+1. Open the Schedule view and paste in a source: a link to a trending
+   article, a few bullet points, or let it pick up your own blog's latest
+   posts automatically.
+2. Open the reader for that post. Pick a **voice** (Normies, Researchers, or
+   Quotes) and a **format** (Tweet, Thread, or LinkedIn post) and hit
+   Generate. Switch voice or format any time -- each combination generates
+   and saves independently, and Regenerate reruns just the one you're
+   looking at.
+3. Read the draft as a stack of tweet cards with live character counts. When
+   it looks right, hit Publish -- this copies the text to your clipboard and
+   opens X's or LinkedIn's own composer so you paste, review, and send it
+   yourself. Nothing is ever posted automatically.
+4. Back in the Schedule view, the "Up next" queue shows what's due with a
+   recommended, staggered date, and a month calendar shows what's already
+   gone out.
 
 ## Ideas for making it yours
 
-<!-- FILL-IN (publishing agent): BEFORE reporting done, replace this comment
-with three to five CONCRETE changes someone could make after adopting this
-(e.g. "point it at a different channel", "swap the daily digest for a weekly
-one", "add a second source alongside Slack"). These are optional invitations
-that show the thing is a starting point -- NOT the manifest's "Requirements",
-which are the things that must be resolved. Do not repeat items across the
-two. -->
+- Add a fourth voice for a different register you write in (a press-release
+  voice, a technical-deep-dive voice, whatever fits your brand).
+- Add a fourth format -- a Threads (Meta) post, a newsletter blurb, a
+  Mastodon toot -- alongside Tweet / Thread / LinkedIn.
+- Feed the Schedule queue from an RSS feed instead of (or alongside) your own
+  blog listing, so threads get suggested the moment any source you follow
+  publishes something new.
+- Build your own voice corpus from your team's Slack, newsletter archive, or
+  past social posts, so drafts are grounded in real examples of how your team
+  actually writes (see "Requirements" in `template.md` for how).
+- Add a lightweight approval step -- Slack-notify a teammate when a new draft
+  is ready, before it shows up in the "Up next" queue.
 
 ## What this is
 

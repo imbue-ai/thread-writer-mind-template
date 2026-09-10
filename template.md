@@ -18,11 +18,20 @@ follow "How to adapt it" below.
 
 A multi-voice, multi-format generator that turns blog posts, links, or bullet points into X threads and LinkedIn posts, with a schedule queue and a cached voice-corpus mechanism.
 
-<!-- FILL-IN (publishing agent): BEFORE reporting done, replace this comment
-with a one-paragraph overview of what this template does for its user: the
-problem it solves, the main things it produces (pages, reports, automations),
-and what the user sees when it is running. Write for a reader who has never
-seen the original mind. -->
+Thread Writer solves the "we published something, now someone has to turn it
+into social posts" problem. Paste a source -- one of your own blog posts, any
+trending link, or a few bullet points -- and it drafts ready-to-post social
+copy from it. Every draft can be written in one of three **voices** (Normies,
+Researchers, or Quotes) and one of three **formats** (a single Tweet, a Thread
+of tweets, or a long-form LinkedIn post), and any voice-and-format combination
+can be generated or regenerated on demand with one click. Running it, the user
+sees two surfaces: a **reader** that renders a chosen draft as a stack of
+tweet cards with live character counts, a voice dropdown, a format tab
+toggle, and a Publish button; and a **Schedule** view with an "Up next" queue
+of what is due to post (each with a recommended, staggered date), a month
+calendar of published posts, and paste-a-link / paste-your-notes inputs.
+Publishing never auto-posts -- it copies the text to the clipboard and opens
+X's or LinkedIn's composer so the user reviews and sends it themselves.
 
 ## How it works
 
@@ -33,13 +42,41 @@ from the original mind onto a clean default-workspace-template base):
 - `system/supervisord.conf`
 - `pyproject.toml`
 
-<!-- FILL-IN (publishing agent): BEFORE reporting done, replace this comment
-with prose that makes the list above self-explanatory: for each included path,
-say what it is (an app or lib with code, a skill, data) and what role it plays.
-Then describe how the pieces wire together at runtime: which supervisord
-programs (in system/supervisord.conf) run them, which ports they listen on and how
-those are registered in forward_port.py (if applicable), and any scripts or
-services that connect them. -->
+**`system/apps/thread_writer`** is the whole app: a single-file Flask service
+(`src/thread_writer/runner.py`) plus its `README.md` and `pyproject.toml`. The
+one module holds everything -- the HTML/CSS/JS for both the reader and the
+Schedule pages (rendered as f-strings, no template engine, no separate
+frontend build), the blog/link/YouTube fetching and parsing, the on-demand
+generation pipeline, and the small JSON registries that persist state.
+
+**`system/supervisord.conf`** runs the app. The `[program:thread-writer]`
+stanza first runs `system/scripts/forward_port.py` (with the app's own icon)
+to register the service so it shows up as a tab in the workspace UI, then
+launches `uv run thread-writer` (the console script defined in the app's own
+`pyproject.toml`, which calls `runner:main`). The whole command is wrapped in
+`system/services/oom_priority/bin/oom_tag_service.py user` so the
+OOM-prevention daemon treats it as a sheddable user service. `main()` serves
+the Flask app on `127.0.0.1` with the threaded Werkzeug server -- threaded
+because generation calls are synchronous and can take ~10-30s, so the server
+must absorb the wait without blocking other requests. Port and data directory
+are overridable via `THREAD_WRITER_PORT` and `THREAD_WRITER_DATA_DIR`.
+
+**`pyproject.toml`** (the workspace root) carries `thread-writer` as a
+workspace member and dependency so `uv run thread-writer` resolves.
+
+At runtime everything hangs off `DATA_DIR` (defaults to
+`data/.apps/thread-writer/`): generated drafts live at
+`DATA_DIR/threads/<slug>/<voice>.<format>.json` (one file per voice+format,
+all the same JSON shape, a LinkedIn post being a single-element `tweets`
+array); pasted links are recorded in `DATA_DIR/trending.json`; pasted notes in
+`DATA_DIR/drafts.json`; mark-as-posted / scheduling state in
+`DATA_DIR/schedule_state.json`; and, if present, the per-voice example
+corpora are read from `DATA_DIR/voices/*.md` (see "Requirements" below --
+none ship with this template). Generation (`/generate`, `/trending`,
+`/draft`) fetches or reads the source text, builds a voice- and
+format-specific prompt grounded only in that text, calls the model, parses
+strict JSON back into tweet strings, and writes the per-post file; the reader
+then renders it.
 
 ## Recipe
 
@@ -66,49 +103,51 @@ theirs. Two kinds of entry, handled at different times:
 - **Adaptation** -- what must be DECIDED or REWIRED, in prose. Worked through
   interactively with the user, after activation.
 
-<!-- FILL-IN (publishing agent): BEFORE reporting done, replace this comment
-with both kinds of entry.
+**Activation**
 
-ACTIVATION -- one line each, using exactly these forms (greppable by `requires_`):
+- requires_llm: calls Claude for generation via the KEYED litellm path
+  (`litellm.completion`, reading `ANTHROPIC_API_KEY` and `ANTHROPIC_BASE_URL`
+  directly from the process environment), using model
+  `anthropic/claude-fable-5` as the primary writer with
+  `anthropic/claude-opus-4-8` as the fallback. This is the only hard
+  requirement to produce any draft. An adopter whose mind uses the keyless
+  subscription path (`claude -p`) must switch the model calls in
+  `_complete_generation` (`runner.py`) to `claude_p_completion` per the
+  use-ai-integration skill -- this is a code change, not config.
 
-- requires_permission: <latchkey scope> / <permission schema> (user-approved;
-  the adopting agent initiates this via a latchkey permission request during
-  setup -- it must not merely mention it)
-- requires_secret: <ENV_VAR or config key> (what it is for and where to put it)
-- requires_llm: <how the code reaches Claude, and what an adopter needs>
-  (include this line whenever the app calls an LLM: name the method it was
-  built for -- keyed litellm via ANTHROPIC_API_KEY, or keyless subscription via
-  claude -p -- so an adopter on the other method knows to switch it per the
-  use-ai-integration skill)
+Blog/link fetching needs no special auth (a plain public HTTP GET), and
+"Publish" never posts anything -- it only copies text and opens a composer in
+the browser -- so neither needs any permission or secret.
 
-Derive the real values from the included code (e.g. every service the app
-calls through `latchkey curl`, and whether any code calls an LLM). Example:
-- requires_permission: slack-api / slack-read-all (user-approved; adopting
-  agent initiates during setup)
-- requires_llm: calls Claude via the keyed litellm path (ANTHROPIC_API_KEY set);
-  an adopter on the keyless subscription path must switch the model calls per
-  use-ai-integration
+**Adaptation**
 
-These lines are what the ADOPTING agent acts on during setup, so a vague or
-missing one silently breaks adoption -- a real incident: an adopter was never
-prompted for a Slack permission the app needed. They are also what the lead
-surfaces back to the publishing user for confirmation, so the list must be
-complete and accurate. EVERY line must have its counterpart in
-`template.toml`'s `[requirements]` (`[[requirements.permission]]`,
-`[[requirements.secret]]`, `[requirements.llm]`); the validator compares
-them and fails the publish if they disagree.
+This app is **Imbue-specific by design**: the original author intentionally
+did not generalize it into config, so adapting it means editing the code, not
+flipping switches.
 
-ADAPTATION -- one bullet each, in plain prose: every gap the adapter must
-decide or rewire (stubbed integrations, hardcoded accounts/channels/ids, data
-that was not included, anything that will not work out of the box). For each,
-say what is missing and what a working replacement looks like. Mirror them as
-`[[requirements.adaptation]]` entries in the TOML.
-
-Do not repeat the README's "Ideas for making it yours" here -- those are
-optional invitations, these are things that must be resolved.
-
-If there is genuinely nothing of either kind, write exactly: "No requirements --
-runs as published, with no external permissions or secrets." -->
+- The blog source is hardcoded to imbue.com (`BLOG_URL` and
+  `_parse_blog_posts`'s markup selectors target imbue.com's exact HTML). An
+  adopter with their own blog points it there and rewrites the parser to
+  match their listing's markup -- or, if they only ever use the paste-a-link
+  and paste-notes inputs, they can ignore the blog listing entirely; those
+  two paths work with no blog at all.
+- Threads generated from the adopter's own blog close on Imbue's mission
+  (`_close_directive`: "Imbue builds software that is open source, runs on
+  your own device, and that you own" plus a CTA). An adopter edits that
+  closing sentence to their own mission/CTA (the external-link and notes
+  closes are already neutral and need no change).
+- The voice presets and guidance are tuned to Imbue (`VOICE_PRESETS`,
+  `_VOICE_GUIDANCE`): "Normies" names swyx and the Imbue Slack, "Researchers"
+  names Andrew Ng and Yann LeCun. An adopter edits these to describe their own
+  target registers.
+- The per-voice example corpora are not shipped -- see "Environment" below.
+  Generation still works out of the box via the built-in inline guidance;
+  an adopter who wants the richer "grounded in real writing" effect drops
+  their own markdown corpus files under `DATA_DIR/voices/` (file names come
+  from `_VOICE_CORPUS_FILES` in `runner.py`).
+- The Schedule "revive" queue's YouTube half is hardcoded to Imbue's channel
+  (`YOUTUBE_HANDLE_URL`). An adopter points it at their own channel handle, or
+  ignores it (the blog half of the queue is independent).
 
 ## Environment
 
@@ -118,17 +157,17 @@ converges it at ITS OWN pinned apt snapshot timestamp, so package versions come
 out consistent with the rest of that mind's environment rather than frozen to
 whatever this publisher happened to have.
 
-<!-- FILL-IN (publishing agent): BEFORE reporting done, replace this comment
-with a plain-language summary of what gets installed and why -- one line per
-thing, naming what needs it (e.g. "poppler-utils: the digest renders PDF
-attachments to text"). Fill in the matching entries in template.toml's
-[environment] table at the same time; that table is what actually installs
-anything, and this prose is what a human reads.
+Nothing extra -- runs on the stock workspace environment. All of the app's
+Python dependencies (Flask, httpx, beautifulsoup4, litellm, etc.) are declared
+in `system/apps/thread_writer/pyproject.toml` and resolve through the normal
+`uv sync --all-packages`; there is no apt package, no global npm/uv/cargo
+tool, and no `env.d` unit to install.
 
-Derive it from the included code, not from what happens to be installed on this
-machine: every binary the code shells out to, every global npm/uv/cargo tool it
-invokes. If it needs nothing beyond the template's own environment, write
-exactly: "Nothing extra -- runs on the stock workspace environment." -->
+One thing worth knowing even though it is not an installable dependency: the
+per-voice example corpora this app can use to ground its writing voice are
+**not** shipped with this template (see "Requirements" above). Out of the box
+every voice falls back to its built-in inline guidance; the corpora are
+opt-in data an adopter supplies themselves.
 
 ## How to adapt it
 
@@ -164,11 +203,12 @@ This template's changelog: what each published version changed. The PUBLISHER
 appends one entry per version (newest last); earlier entries are never rewritten.
 This is distinct from "Adaptation history" below, which is the ADOPTERS' log.
 
-<!-- FILL-IN (publishing agent): BEFORE reporting done, replace this comment with
-the first entry, in the form:
-### v1 (YYYY-MM-DD) -- <one line: what this first version publishes>
-using today's date. A later update of this template (the update-published-template
-flow) appends "### v2 (date) -- what changed since v1", and so on. -->
+### v1 (2026-09-10) -- Initial publish of the Thread Writer app: multi-voice
+(Normies / Researchers / Quotes) x multi-format (Tweet / Thread / LinkedIn)
+generation from blog posts, pasted links, or notes, with a Schedule queue,
+calendar, on-demand Generate/Regenerate, and copy-and-open Publish. Re-cut
+from `jean-imbue/thread-writer` (pinned at `minds-v0.3.9`) onto this mind's
+current base.
 
 ## Adaptation history
 
